@@ -211,8 +211,8 @@ thread_create (const char *name, int priority,
   struct exitcode *ret = malloc(sizeof(struct exitcode));
   ret->pid = t->tid;
   t->load_status = NOT_LOADED;
-  t->wait = 0; // false
-  t->exit = 0; // false
+  t->wait = 0;
+  t->exit = 0;
   sema_init(&t->load_sema, 0);
   sema_init(&t->exit_sema, 0);
   list_push_back(&thread_current()->exitcode_list, &ret->elem);

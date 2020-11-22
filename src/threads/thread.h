@@ -102,19 +102,19 @@ struct thread
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
 
-    int load_status;
-    int wait;
-    int exit;
+    int load_status;                    /* success of open_file */
+    int wait;                           /* a thread only be waited once */
+    int exit;                           /* exit or not */
 
-    struct semaphore load_sema;         
-    struct semaphore exit_sema;
-    // Project 2
-    int fd;                             /* File descriptor. */
-    struct file* myFile;               /* Use to deny writes to executables. */
-    struct list file_list;              /* List of files. */
+    struct semaphore load_sema;         /* wait child thread load */  
+    struct semaphore exit_sema;         /* wait child thread exit */
+
+    int fd;                             /* fd number of file */
+    struct file* myFile;                /* to deny writes */
+    struct list file_list;              /* list of files. */
     
-    struct exitcode* ret;           /* Point to child process. */
-    struct list exitcode_list;             /* List of child processes. */
+    struct exitcode* ret;               /* a struct contain exitcode, hold by self and parent */
+    struct list exitcode_list;          /* list of children exitcode struct */
     
 };
 
