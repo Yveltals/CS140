@@ -172,6 +172,10 @@ thread_create (const char *name, int priority,
   struct switch_entry_frame *ef;
   struct switch_threads_frame *sf;
   tid_t tid;
+
+  // if(list_size(&all_list)>35)
+  //   return TID_ERROR;
+
   enum intr_level old_level;
 
   ASSERT (function != NULL);
@@ -631,4 +635,8 @@ struct thread* find_thread(int pid)
       if (t->tid == pid) return t;
     }
     return NULL;
+}
+
+int thread_cnt (void){
+  return list_size(&all_list);
 }

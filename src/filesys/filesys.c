@@ -2,6 +2,7 @@
 #include <debug.h>
 #include <stdio.h>
 #include <string.h>
+#include "threads/thread.h"
 #include "filesys/file.h"
 #include "filesys/free-map.h"
 #include "filesys/inode.h"
@@ -71,7 +72,9 @@ filesys_open (const char *name)
 
   if (dir != NULL)  // all not null
     dir_lookup (dir, name, &inode);
-  // dir_close (dir); //TODO
+  
+  if(thread_cnt()>2)
+    dir_close (dir); //TODO
 
   return file_open (inode);
 }

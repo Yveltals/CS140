@@ -157,4 +157,6 @@ int thread_get_load_avg (void);
 int is_thread_alive (int pid);                      /* Thread alive */
 struct exitcode* add_child_process (int pid);  /* Add child process */
 struct thread* find_thread(int pid);
+
+int thread_cnt (void);
 #endif /* threads/thread.h */

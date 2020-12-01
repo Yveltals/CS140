@@ -238,9 +238,10 @@ get_args (struct intr_frame *f, int *args, int num_of_args)
 void
 syscall_exit (int status)
 {
+    status = status < 0? -1 : status;
     struct thread *cur = thread_current();
     if (cur->ret)
-        cur->ret->status = status<0 ? -1 : status;
+        cur->ret->status = status;
     printf("%s: exit(%d)\n", cur->name, status);
     thread_exit(); //call process_exit()
 }
