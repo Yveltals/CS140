@@ -35,6 +35,12 @@ struct semaphore writelock;
 struct semaphore mutex;
 int readcount;
 
+static inline void check_user_sp(const void* sp){
+  if(!is_user_vaddr(sp)||sp<0x08048000){
+    exit(-1);
+  }
+}
+
 void
 syscall_init (void)
 {
@@ -55,7 +61,7 @@ syscall_handler (struct intr_frame *f UNUSED)
     int arg[3];
     int esp = getpage_ptr((const void *) f->esp);
 
-    switch (* (int *) esp)
+    switch (*(int*)esp)
     {
         case SYS_HALT:
             syscall_halt();
@@ -68,14 +74,10 @@ syscall_handler (struct intr_frame *f UNUSED)
 
         case SYS_EXEC:
             get_args(f, &arg[0], 1);
-
-            // check if command line is valid
+            /* Check if command line is valid */
             check_str((const void*)arg[0]);
-
-            // get page pointer
             arg[0] = getpage_ptr((const void *)arg[0]);
-            /* syscall_exec(const char* cmdline) */
-            f->eax = syscall_exec((const char*)arg[0]); // execute the command line
+            f->eax = syscall_exec((const char*)arg[0]);
             break;
 
         case SYS_WAIT:
@@ -85,70 +87,43 @@ syscall_handler (struct intr_frame *f UNUSED)
 
         case SYS_CREATE:
             get_args(f, &arg[0], 2);
-            // get page pointer
             arg[0] = getpage_ptr((const void *) arg[0]);
-            /* syscall_create(const char* file_name, unsigned starting_size) */
-            f->eax = syscall_create((const char *)arg[0], (unsigned)arg[1]);  // create this file
+            f->eax = syscall_create((const char *)arg[0], (unsigned)arg[1]);
             break;
 
         case SYS_REMOVE:
             get_args(f, &arg[0], 1);
             arg[0] = getpage_ptr((const void *) arg[0]);
-
-            /* syscall_remove(const char* file_name) */
-            f->eax = syscall_remove((const char *)arg[0]);  // remove this file
+            f->eax = syscall_remove((const char *)arg[0]);
             break;
 
         case SYS_OPEN:
             get_args(f, &arg[0], 1);
-
-            /* Check if command line is valid.
-             * We do not want to open junk which can cause a crash
-             */
+            /* Check if command line is valid */
             check_str((const void*)arg[0]);
-
-            // get page pointer
             arg[0] = getpage_ptr((const void *)arg[0]);
-
-            /* syscall_open(int fd) */
-            f->eax = syscall_open((const char *)arg[0]);  // open this file
+            f->eax = syscall_open((const char *)arg[0]);
             break;
 
         case SYS_FILESIZE:
             get_args(f, &arg[0], 1);
-
-            /* syscall_filesize (const char *file_name) */
-            f->eax = syscall_filesize(arg[0]);  // obtain file size
+            f->eax = syscall_filesize(arg[0]);
             break;
 
         case SYS_READ:
             get_args(f, &arg[0], 3);
-            // get page pointer
             arg[1] = getpage_ptr((const void *)arg[1]);
-            /*syscall_read(int fd, void *buffer, unsigned length)*/
             f->eax = syscall_read(arg[0], (void *) arg[1], (unsigned) arg[2]);
             break;
 
         case SYS_WRITE:
             get_args(f, &arg[0], 3);
-
-            /* Check if the buffer is valid.
-             * We do not want to mess with a buffer that is out of our
-             * reserved virtual memory
-             */
-
-            ((const void*)arg[1], (unsigned)arg[2]);
-
-            // get page pointer
             arg[1] = getpage_ptr((const void *)arg[1]);
-
-            /* syscall_write (int fd, const void * buffer, unsigned bytes)*/
             f->eax = syscall_write(arg[0], (const void *) arg[1], (unsigned) arg[2]);
             break;
 
         case SYS_SEEK:
             get_args(f, &arg[0], 2);
-            /* syscall_seek(int fd, unsigned new_position) */
             syscall_seek(arg[0], (unsigned)arg[1]);
             break;
 
@@ -365,9 +340,7 @@ getpage_ptr(const void *vaddr)
         syscall_exit(ERROR);
     void *ptr = pagedir_get_page(thread_current()->pagedir, vaddr);
     if (!ptr)
-    {
         syscall_exit(ERROR);
-    }
     return (int)ptr;
 }
 
