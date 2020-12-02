@@ -128,7 +128,7 @@ process_exit (void)
   struct thread *cur = thread_current ();
   uint32_t *pd;
 
-  syscall_close(CLOSE_ALL_FD);
+  syscall_close(CLOSE_ALL);
 
   if (cur->myFile)
     file_close(cur->myFile);

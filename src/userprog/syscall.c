@@ -31,15 +31,6 @@ void check_ptr (const void* vaddr);
 void check_str (const void* str);
 
 
-struct semaphore writelock;
-struct semaphore mutex;
-int readcount;
-
-static inline void check_user_sp(const void* sp){
-  if(!is_user_vaddr(sp)||sp<0x08048000){
-    exit(-1);
-  }
-}
 
 void
 syscall_init (void)
@@ -50,11 +41,6 @@ syscall_init (void)
     readcount = 0;
 }
 
-/*
- * This method handles for various case of system command.
- * This handler invokes the proper function call to be carried
- * out base on the command line.
- */
 static void
 syscall_handler (struct intr_frame *f UNUSED)
 {
@@ -139,20 +125,6 @@ syscall_handler (struct intr_frame *f UNUSED)
 
         default:
             break;
-    }
-}
-
-/* get arguments from stack */
-void
-get_args (struct intr_frame *f, int *args, int num_of_args)
-{
-    int i;
-    int *ptr;
-    for (i = 0; i < num_of_args; i++)
-    {
-        ptr = (int *) f->esp + i + 1;
-        check_ptr((const void *) ptr);
-        args[i] = *ptr;
     }
 }
 
@@ -302,12 +274,12 @@ syscall_close(int fd)
     {
         next = list_next(e);
         struct openfile *process_file_ptr = list_entry (e, struct openfile, elem);
-        if (fd == process_file_ptr->fd || fd == CLOSE_ALL_FD)
+        if (fd == process_file_ptr->fd || fd == CLOSE_ALL)
         {
             file_close(process_file_ptr->file);
             list_remove(&process_file_ptr->elem);
             free(process_file_ptr);
-            if (fd != CLOSE_ALL_FD)
+            if (fd != CLOSE_ALL)
             {
                 return;
             }
@@ -317,32 +289,6 @@ syscall_close(int fd)
 
 
 //===========================================================
-
-void
-check_ptr (const void *vaddr)
-{
-    if (vaddr < USER_VADDR_BOTTOM || !is_user_vaddr(vaddr))
-        syscall_exit(ERROR);
-}
-
-void
-check_str (const void* str)
-{
-    for (; *(char*)getpage_ptr(str) != 0; str = (char *)str + 1);
-}
-
-
-/* get the pointer to page */
-int
-getpage_ptr(const void *vaddr)
-{
-    if (vaddr >= (void *)0xc0000000)
-        syscall_exit(ERROR);
-    void *ptr = pagedir_get_page(thread_current()->pagedir, vaddr);
-    if (!ptr)
-        syscall_exit(ERROR);
-    return (int)ptr;
-}
 
 struct exitcode* find_exitcode(int pid)
 {
@@ -378,4 +324,43 @@ struct file* find_file (int fd)
         }
     }
     return NULL;
+}
+
+void
+check_ptr (const void *vaddr)
+{
+    if (vaddr < (void *)0x08048000 || !is_user_vaddr(vaddr))
+        syscall_exit(ERROR);
+}
+
+void
+check_str (const void* str)
+{
+    for (; *(char*)getpage_ptr(str) != 0; str = (char *)str + 1);
+}
+
+
+/* get the pointer to page */
+int
+getpage_ptr(const void *vaddr)
+{
+    if (vaddr >= (void *)0xc0000000)
+        syscall_exit(ERROR);
+    void *ptr = pagedir_get_page(thread_current()->pagedir, vaddr);
+    if (!ptr)
+        syscall_exit(ERROR);
+    return (int)ptr;
+}
+/* get arguments from stack */
+void
+get_args (struct intr_frame *f, int *args, int num_of_args)
+{
+    int i;
+    int *ptr;
+    for (i = 0; i < num_of_args; i++)
+    {
+        ptr = (int *) f->esp + i + 1;
+        check_ptr((const void *) ptr);
+        args[i] = *ptr;
+    }
 }
