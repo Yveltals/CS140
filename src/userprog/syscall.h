@@ -23,10 +23,7 @@ struct openfile {
     struct list_elem elem;
 };
 
-struct lock file_system_lock;
-struct semaphore writelock;
-struct semaphore mutex;
-int readcount;
+struct semaphore filelock;
 
 void syscall_close(int fd);
 void syscall_exit (int status);

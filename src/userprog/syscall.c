@@ -36,9 +36,7 @@ void
 syscall_init (void)
 {
     intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
-    sema_init(&writelock, 1);
-    sema_init(&mutex, 1);
-    readcount = 0;
+    sema_init(&filelock, 1);
 }
 
 static void
@@ -208,10 +206,7 @@ syscall_read(int fd, void *buffer, unsigned size)
   unsigned count = size;
   int value = 0;
 
-  sema_down(&mutex);
-  readcount++;
-  if(readcount == 1) sema_down(&writelock);
-  sema_up(&mutex);
+  sema_down(&filelock);
 
   if(fd == 0) { //no getbuf()
     while(count--){
@@ -224,11 +219,7 @@ syscall_read(int fd, void *buffer, unsigned size)
   }
   else value = file_read(find_file(fd),buffer,size);
 
-  sema_down(&mutex);
-  readcount--;
-  if(readcount == 0) sema_up(&writelock);
-  sema_up(&mutex);
-
+  sema_up(&filelock);
   return value;
 }
 
@@ -239,7 +230,7 @@ syscall_write (int fd, const void * buffer, unsigned byte_size)
     if (byte_size <= 0) 
         return byte_size;
 
-    sema_down(&writelock);
+    sema_down(&filelock);
     if (fd == 1) { //OUTPUT
         putbuf (buffer, byte_size);
         value = byte_size;
@@ -247,7 +238,7 @@ syscall_write (int fd, const void * buffer, unsigned byte_size)
     else 
         value = file_write(find_file(fd), buffer, byte_size);
     
-    sema_up(&writelock);
+    sema_up(&filelock);
     return value;
 }
 
