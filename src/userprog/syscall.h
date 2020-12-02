@@ -26,10 +26,12 @@ struct openfile {
 
 struct lock file_system_lock;
 
+
+void syscall_close(int fd);
+
 int getpage_ptr (const void *vaddr);
-struct exitcode* find_child_process (int pid);
+struct exitcode* find_exitcode (int pid);
 void remove_child_process (struct exitcode *child);
-struct file* get_file(int filedes);
-void process_close_file (int file_descriptor);
+struct file* find_file(int fd);
 void syscall_exit (int status);
 #endif /* userprog/syscall.h */

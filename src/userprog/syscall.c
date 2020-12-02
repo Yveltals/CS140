@@ -14,9 +14,6 @@
 #include "filesys/file.h"
 #include "filesys/filesys.h"
 
-#define MAX_ARGS 3
-
-
 static void syscall_handler (struct intr_frame *);
 void get_args (struct intr_frame *f, int *arg, int num_of_args);
 void syscall_halt (void);
@@ -30,12 +27,9 @@ int syscall_read(int fd, void *buffer, unsigned length);
 int syscall_write (int fd, const void * buffer, unsigned byte_size);
 void syscall_seek (int fd, unsigned new_position);
 unsigned syscall_tell(int fildes);
-void syscall_close(int fd);
-void validate_ptr (const void* vaddr);
-void validate_str (const void* str);
-void validate_buffer (const void* buf, unsigned byte_size);
+void check_ptr (const void* vaddr);
+void check_str (const void* str);
 
-bool FILE_LOCK_INIT = false;
 
 struct semaphore writelock;
 struct semaphore mutex;
@@ -58,7 +52,7 @@ syscall_init (void)
 static void
 syscall_handler (struct intr_frame *f UNUSED)
 {
-    int arg[MAX_ARGS];
+    int arg[3];
     int esp = getpage_ptr((const void *) f->esp);
 
     switch (* (int *) esp)
@@ -76,7 +70,7 @@ syscall_handler (struct intr_frame *f UNUSED)
             get_args(f, &arg[0], 1);
 
             // check if command line is valid
-            validate_str((const void*)arg[0]);
+            check_str((const void*)arg[0]);
 
             // get page pointer
             arg[0] = getpage_ptr((const void *)arg[0]);
@@ -111,7 +105,7 @@ syscall_handler (struct intr_frame *f UNUSED)
             /* Check if command line is valid.
              * We do not want to open junk which can cause a crash
              */
-            validate_str((const void*)arg[0]);
+            check_str((const void*)arg[0]);
 
             // get page pointer
             arg[0] = getpage_ptr((const void *)arg[0]);
@@ -160,13 +154,11 @@ syscall_handler (struct intr_frame *f UNUSED)
 
         case SYS_TELL:
             get_args(f, &arg[0], 1);
-            /* syscall_tell(int fd) */
             f->eax = syscall_tell(arg[0]);
             break;
 
         case SYS_CLOSE:
             get_args (f, &arg[0], 1);
-            /* syscall_close(int fd) */
             syscall_close(arg[0]);
             break;
 
@@ -184,7 +176,7 @@ get_args (struct intr_frame *f, int *args, int num_of_args)
     for (i = 0; i < num_of_args; i++)
     {
         ptr = (int *) f->esp + i + 1;
-        validate_ptr((const void *) ptr);
+        check_ptr((const void *) ptr);
         args[i] = *ptr;
     }
 }
@@ -259,7 +251,7 @@ syscall_open(const char *file_name)
 int
 syscall_filesize(int fd)
 {
-    return file_length(get_file(fd));
+    return file_length(find_file(fd));
 }
 
 int
@@ -283,7 +275,7 @@ syscall_read(int fd, void *buffer, unsigned size)
     }
     value = size - count;
   }
-  else value = file_read(get_file(fd),buffer,size);
+  else value = file_read(find_file(fd),buffer,size);
 
   sema_down(&mutex);
   readcount--;
@@ -306,7 +298,7 @@ syscall_write (int fd, const void * buffer, unsigned byte_size)
         value = byte_size;
     }
     else 
-        value = file_write(get_file(fd), buffer, byte_size);
+        value = file_write(find_file(fd), buffer, byte_size);
     
     sema_up(&writelock);
     return value;
@@ -315,41 +307,53 @@ syscall_write (int fd, const void * buffer, unsigned byte_size)
 void
 syscall_seek (int fd, unsigned new_position)
 {
-    file_seek(get_file(fd), new_position);
+    file_seek(find_file(fd), new_position);
 }
 
 unsigned
 syscall_tell(int fd)
 {
-    return file_tell(get_file(fd));
+    return file_tell(find_file(fd));
 }
 
 void
 syscall_close(int fd)
 {
-    process_close_file(fd);
+    struct thread *t = thread_current();
+    struct list_elem *next;
+    struct list_elem *e = list_begin(&t->file_list);
+    
+    for (;e != list_end(&t->file_list); e = next)
+    {
+        next = list_next(e);
+        struct openfile *process_file_ptr = list_entry (e, struct openfile, elem);
+        if (fd == process_file_ptr->fd || fd == CLOSE_ALL_FD)
+        {
+            file_close(process_file_ptr->file);
+            list_remove(&process_file_ptr->elem);
+            free(process_file_ptr);
+            if (fd != CLOSE_ALL_FD)
+            {
+                return;
+            }
+        }
+    }
 }
 
 
 //===========================================================
 
-
-/* function to check if pointer is valid */
 void
-validate_ptr (const void *vaddr)
+check_ptr (const void *vaddr)
 {
     if (vaddr < USER_VADDR_BOTTOM || !is_user_vaddr(vaddr))
-    {
-        // virtual memory address is not reserved for us (out of bound)
         syscall_exit(ERROR);
-    }
 }
 
-/* function to check if string is valid */
 void
-validate_str (const void* str)
+check_str (const void* str)
 {
-    for (; * (char *) getpage_ptr(str) != 0; str = (char *) str + 1);
+    for (; *(char*)getpage_ptr(str) != 0; str = (char *)str + 1);
 }
 
 
@@ -367,8 +371,7 @@ getpage_ptr(const void *vaddr)
     return (int)ptr;
 }
 
-/* find a child process based on pid */
-struct exitcode* find_child_process(int pid)
+struct exitcode* find_exitcode(int pid)
 {
     struct thread *t = thread_current();
     struct list_elem *e;
@@ -386,8 +389,7 @@ struct exitcode* find_child_process(int pid)
     return NULL;
 }
 
-/* get file that matches file descriptor */
-struct file* get_file (int fd)
+struct file* find_file (int fd)
 {
     struct thread *t = thread_current();
     struct list_elem* next;
@@ -402,30 +404,5 @@ struct file* get_file (int fd)
             return process_file_ptr->file;
         }
     }
-    return NULL; // nothing found
-}
-
-
-/* close the desired file descriptor */
-void process_close_file (int file_descriptor)
-{
-    struct thread *t = thread_current();
-    struct list_elem *next;
-    struct list_elem *e = list_begin(&t->file_list);
-    
-    for (;e != list_end(&t->file_list); e = next)
-    {
-        next = list_next(e);
-        struct openfile *process_file_ptr = list_entry (e, struct openfile, elem);
-        if (file_descriptor == process_file_ptr->fd || file_descriptor == CLOSE_ALL_FD)
-        {
-            file_close(process_file_ptr->file);
-            list_remove(&process_file_ptr->elem);
-            free(process_file_ptr);
-            if (file_descriptor != CLOSE_ALL_FD)
-            {
-                return;
-            }
-        }
-    }
+    return NULL;
 }

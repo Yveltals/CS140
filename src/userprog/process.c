@@ -104,7 +104,7 @@ int
 process_wait (tid_t child_tid UNUSED) 
 {
   struct thread* t = find_thread(child_tid);
-  struct exitcode* ret = find_child_process(child_tid);
+  struct exitcode* ret = find_exitcode(child_tid);
   if (!ret)
       return ERROR;
 
@@ -128,7 +128,7 @@ process_exit (void)
   struct thread *cur = thread_current ();
   uint32_t *pd;
 
-  process_close_file(CLOSE_ALL_FD);
+  syscall_close(CLOSE_ALL_FD);
 
   if (cur->myFile)
     file_close(cur->myFile);
