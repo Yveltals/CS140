@@ -18,7 +18,6 @@
 
 
 static void syscall_handler (struct intr_frame *);
-// int add_file (struct file *file_name);
 void get_args (struct intr_frame *f, int *arg, int num_of_args);
 void syscall_halt (void);
 pid_t syscall_exec(const char* cmdline);
@@ -41,10 +40,7 @@ bool FILE_LOCK_INIT = false;
 struct semaphore writelock;
 struct semaphore mutex;
 int readcount;
-/*
- * System call initializer
- * It handles the set up for system call operations.
- */
+
 void
 syscall_init (void)
 {
@@ -72,13 +68,11 @@ syscall_handler (struct intr_frame *f UNUSED)
             break;
 
         case SYS_EXIT:
-            // fill arg with the amount of arguments needed
             get_args(f, &arg[0], 1);
             syscall_exit(arg[0]);
             break;
 
         case SYS_EXEC:
-            // fill arg with the amount of arguments needed
             get_args(f, &arg[0], 1);
 
             // check if command line is valid
@@ -91,33 +85,20 @@ syscall_handler (struct intr_frame *f UNUSED)
             break;
 
         case SYS_WAIT:
-            // fill arg with the amount of arguments needed
             get_args(f, &arg[0], 1);
             f->eax = syscall_wait(arg[0]);
             break;
 
         case SYS_CREATE:
-            // fill arg with the amount of arguments needed
             get_args(f, &arg[0], 2);
-
-            //check if command line is valid
-            validate_str((const void *)arg[0]);
-
             // get page pointer
             arg[0] = getpage_ptr((const void *) arg[0]);
-
             /* syscall_create(const char* file_name, unsigned starting_size) */
             f->eax = syscall_create((const char *)arg[0], (unsigned)arg[1]);  // create this file
             break;
 
         case SYS_REMOVE:
-            // fill arg with the amount of arguments needed
             get_args(f, &arg[0], 1);
-
-            /* check if command line is valid */
-            validate_str((const void*)arg[0]);
-
-            // get page pointer
             arg[0] = getpage_ptr((const void *) arg[0]);
 
             /* syscall_remove(const char* file_name) */
@@ -125,7 +106,6 @@ syscall_handler (struct intr_frame *f UNUSED)
             break;
 
         case SYS_OPEN:
-            // fill arg with amount of arguments needed
             get_args(f, &arg[0], 1);
 
             /* Check if command line is valid.
@@ -141,7 +121,6 @@ syscall_handler (struct intr_frame *f UNUSED)
             break;
 
         case SYS_FILESIZE:
-            // fill arg with amount of arguments needed
             get_args(f, &arg[0], 1);
 
             /* syscall_filesize (const char *file_name) */
@@ -149,25 +128,14 @@ syscall_handler (struct intr_frame *f UNUSED)
             break;
 
         case SYS_READ:
-            // fill arg with the amount of arguments needed
             get_args(f, &arg[0], 3);
-
-            /* Check if the buffer is valid.
-             * We do not want to mess with a buffer that is out of our
-             * reserved virtual memory
-             */
-            validate_buffer((const void*)arg[1], (unsigned)arg[2]);
-
             // get page pointer
             arg[1] = getpage_ptr((const void *)arg[1]);
-
             /*syscall_read(int fd, void *buffer, unsigned length)*/
             f->eax = syscall_read(arg[0], (void *) arg[1], (unsigned) arg[2]);
             break;
 
         case SYS_WRITE:
-
-            // fill arg with the amount of arguments needed
             get_args(f, &arg[0], 3);
 
             /* Check if the buffer is valid.
@@ -185,21 +153,18 @@ syscall_handler (struct intr_frame *f UNUSED)
             break;
 
         case SYS_SEEK:
-            // fill arg with the amount of arguments needed
             get_args(f, &arg[0], 2);
             /* syscall_seek(int fd, unsigned new_position) */
             syscall_seek(arg[0], (unsigned)arg[1]);
             break;
 
         case SYS_TELL:
-            // fill arg with the amount of arguments needed
             get_args(f, &arg[0], 1);
             /* syscall_tell(int fd) */
             f->eax = syscall_tell(arg[0]);
             break;
 
         case SYS_CLOSE:
-            // fill arg with the amount of arguments needed
             get_args (f, &arg[0], 1);
             /* syscall_close(int fd) */
             syscall_close(arg[0]);
@@ -208,13 +173,6 @@ syscall_handler (struct intr_frame *f UNUSED)
         default:
             break;
     }
-}
-
-/* halt */
-void
-syscall_halt (void)
-{
-    shutdown_power_off(); // from shutdown.h
 }
 
 /* get arguments from stack */
@@ -231,10 +189,11 @@ get_args (struct intr_frame *f, int *args, int num_of_args)
     }
 }
 
-/* System call exit
- * Checks if the current thread to exit is a child.
- * If so update the child's parent information accordingly.
- */
+void
+syscall_halt (void)
+{
+    shutdown_power_off();
+}
 void
 syscall_exit (int status)
 {
@@ -246,14 +205,10 @@ syscall_exit (int status)
     thread_exit(); //call process_exit()
 }
 
-/* syscall exec
- * Executes the command line and returns
- * the pid of the thread currently executing
- * the command.
- */
 pid_t
 syscall_exec(const char* cmdline)
 {
+    // executes the command line
     pid_t pid = process_execute(cmdline);
     struct thread* t = find_thread(pid);
 
@@ -265,35 +220,31 @@ syscall_exec(const char* cmdline)
     return pid;
 }
 
-/* wait */
 int
 syscall_wait(pid_t pid)
 {
     return process_wait(pid);
 }
 
-/* syscall_create */
 bool
 syscall_create(const char* file_name, unsigned starting_size)
 {
     return filesys_create(file_name, starting_size);
 }
 
-/* syscall_remove */
 bool
 syscall_remove(const char* file_name)
 {
     return filesys_remove(file_name);
 }
 
-/* syscall_open */
 int
 syscall_open(const char *file_name)
 {
-    struct file *fp = filesys_open(file_name); // from filesys.h
+    struct file *fp = filesys_open(file_name);
     if (!fp) return ERROR;
 
-    /* add file to file list and return file descriptor of added file*/
+    /* add file to file list */
     struct openfile *process_fp = malloc(sizeof(struct openfile));
     if (!process_fp) return ERROR;
 
@@ -305,16 +256,12 @@ syscall_open(const char *file_name)
     return process_fp->fd;
 }
 
-/* syscall_filesize */
 int
 syscall_filesize(int fd)
 {
     return file_length(get_file(fd));
 }
 
-/* syscall_read */
-#define STD_INPUT 0
-#define STD_OUTPUT 1
 int
 syscall_read(int fd, void *buffer, unsigned size)
 {
@@ -354,7 +301,7 @@ syscall_write (int fd, const void * buffer, unsigned byte_size)
         return byte_size;
 
     sema_down(&writelock);
-    if (fd == STD_OUTPUT) {
+    if (fd == 1) { //OUTPUT
         putbuf (buffer, byte_size);
         value = byte_size;
     }
@@ -384,7 +331,7 @@ syscall_close(int fd)
 }
 
 
-
+//===========================================================
 
 
 /* function to check if pointer is valid */
@@ -405,18 +352,6 @@ validate_str (const void* str)
     for (; * (char *) getpage_ptr(str) != 0; str = (char *) str + 1);
 }
 
-/* function to check if buffer is valid */
-void
-validate_buffer(const void* buf, unsigned byte_size)
-{
-    unsigned i = 0;
-    char* local_buffer = (char *)buf;
-    for (; i < byte_size; i++)
-    {
-        validate_ptr((const void*)local_buffer);
-        local_buffer++;
-    }
-}
 
 /* get the pointer to page */
 int

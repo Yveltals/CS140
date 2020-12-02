@@ -607,27 +607,20 @@ allocate_tid (void)
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);
 
-/* Traverse through list of threads and check if thread with
-   the desired pid is alive */
-int is_thread_alive (int pid){
+int is_thread_alive (int pid) {
     struct list_elem *e;
     struct list_elem *next;
     for (e = list_begin(&all_list); e != list_end(&all_list); e = next)
     {
         next = list_next(e);
         struct thread *t = list_entry (e, struct thread, allelem);
-        if (t->tid == pid)
-        {
-            // PID match returns true
-            return 1;
-        }
+        if (t->tid == pid) return 1;
     }
-    return 0; // Else thread no longer alive
+    return 0;
 }
 
 
-struct thread* find_thread(int pid)
-{
+struct thread* find_thread(int pid) {
     struct list_elem *e;
     for (e = list_begin (&all_list); e != list_end (&all_list); e = list_next (e))
     {
@@ -637,6 +630,6 @@ struct thread* find_thread(int pid)
     return NULL;
 }
 
-int thread_cnt (void){
+int thread_cnt (void) {
   return list_size(&all_list);
 }

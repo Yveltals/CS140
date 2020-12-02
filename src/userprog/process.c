@@ -34,15 +34,14 @@ process_execute (const char *file_name)
   char *fn_copy;
   tid_t tid;
 
-  /* Make a copy of FILE_NAME.
-     Otherwise there's a race between the caller and load(). */
+  /* Make a copy of FILE_NAME */
   fn_copy = palloc_get_page (0);
   if (fn_copy == NULL)
     return TID_ERROR;
   strlcpy (fn_copy, file_name, PGSIZE);
 
-  char *saveptr;    /* Pointer */
-  file_name = strtok_r((char*)file_name, " ", &saveptr ); /* */
+  char *saveptr;
+  file_name = strtok_r((char*)file_name, " ", &saveptr );
 
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
@@ -130,9 +129,9 @@ process_exit (void)
   uint32_t *pd;
 
   process_close_file(CLOSE_ALL_FD);
-  /* Check if current thread is an myFile, close if so */
+
   if (cur->myFile)
-    file_close(cur->myFile); /* From file.h */
+    file_close(cur->myFile);
 
   cur->exit = 1;
   sema_up(&cur->exit_sema);
@@ -490,30 +489,21 @@ setup_stack (void **esp, char **saveptr, const char *filename)
         palloc_free_page (kpage);
         return success;
       }
-      //-------------------------------------
-      
-      const int DEFAULT_ARGV = 2;
-      int arg_size = DEFAULT_ARGV;
-      char* token;
-      char** argv = malloc(DEFAULT_ARGV*sizeof(char*));
-      char** cont = malloc(DEFAULT_ARGV*sizeof(char*)); //TODO !!!
 
+      //-------------------------------------
       int i, argc = 0;
+      char* token;
+      char** argv = malloc(1024*sizeof(char*));
       
-      /* Copy command line into cont and resize to necessary size */
+      /* Copy command line */
       for (token = (char*)filename; token != NULL; token = strtok_r(NULL, " ", saveptr)){
         *esp -= strlen(token)+1;
         memcpy (*esp, token, strlen(token)+1);
         argv[argc++] = *esp;
-        if (argc >= arg_size) {
-            arg_size *= 2;
-            cont = realloc (cont, arg_size*sizeof(char*));
-            argv = realloc (argv, arg_size*sizeof(char*));
-        }
       }
       argv[argc] = 0;
 
-      /* Word align by word size (4 bytes) */
+      /* Word align(4 bytes) */
       while ((size_t)*esp % 4) 
         *esp -= 1;
 
@@ -530,12 +520,11 @@ setup_stack (void **esp, char **saveptr, const char *filename)
       /* Push argc */
       *esp -= sizeof (int);
       memcpy(*esp, &argc, sizeof(int));
-      /* Push fake return address */
+      /* Push return address */
       *esp -= sizeof(void*);
       memcpy(*esp, &argv[argc], sizeof (void*));
-      /* Free argv and cont */
+      /* Free argv  */
       free(argv);
-      free(cont);
     }
   return success;
 }
